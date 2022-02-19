@@ -4,9 +4,10 @@ import math
 
 aspect = (800, 600)
 player_size = (100, 50)
-ball_size = (25,25)
+ball_size = 25
 barrier_size = (50,25)
 color_gradient = [(150, 0, 0), (150, 100, 0), (0, 150, 0), (0, 50, 150), (75, 0, 75)]
+angle_const = 1.0
 
 def init_barriers(size):
     barriers = []
@@ -33,6 +34,10 @@ class Barrier():
         self.rect = (x,y,width,height)
     def draw(self, win):
         pygame.draw.rect(win,self.color, self.rect)
+    def check_collide(self, ball, barriers):
+        if pygame.Rect.colliderect(pygame.Rect(self.rect), pygame.Rect(ball.rect)):
+            # global barriers
+            barriers.remove(self)
 
 class Ball():
     def __init__(self, x, y, side, color):
@@ -43,33 +48,43 @@ class Ball():
         self.color = color
         self.rect = (x,y,side,side)
         self.dir = math.pi*(random.random()-0.5)
-        self.vel = 3
+        self.vel = 5
     def draw(self, win):
         pygame.draw.rect(win,self.color, self.rect)
     def bounce(self, edge_dir):
-        #self.dir = math.acos(-math.cos(dir-edge_dir)) + math.asin(-math.sin(dir-edge_dir))
-        self.dir -= math.pi/2
-    def move(self):
+        self.dir = -self.dir + edge_dir*2
+    def move(self, player):
         x_diff = self.vel*math.cos(self.dir)
         y_diff = self.vel*math.sin(self.dir)
         if self.x + x_diff < 0:
             self.x = 0
-            self.bounce(0)
-        elif self.x + x_diff > aspect[0]-ball_size[0]:
-            self.x = aspect[0]-ball_size[0]
-            self.bounce(0)
+            self.bounce(math.pi/2)
+        elif self.x + x_diff > aspect[0]-ball_size:
+            self.x = aspect[0]-ball_size
+            self.bounce(math.pi/2)
         else:
             self.x += self.vel*math.cos(self.dir)
         
         if self.y + y_diff < 0:
             self.y = 0
-            self.bounce(math.pi/2)
-        elif self.y + y_diff > aspect[1]-ball_size[1]:
-            self.y = aspect[1]-ball_size[1]
-            self.bounce(math.pi/2)
+            self.bounce(0)
+        elif self.y + y_diff > aspect[1]-ball_size:
+            self.y = aspect[1]-ball_size
+            pygame.quit()
         else:
             self.y += self.vel*math.sin(self.dir)
         
+        if pygame.Rect.colliderect(pygame.Rect(self.rect), pygame.Rect(player.rect)):
+            self.y = aspect[1]-player_size[1]
+            player_center = (player.x+player_size[0], player.y+player_size[1])
+            ball_center = (self.x+ball_size/2, self.y+ball_size/2)
+            new_vec = (ball_center[0]-player_center[0],ball_center[1]-player_center[1])
+            ref = (1,0)
+            self.dir += angle_const*(math.acos((ref[0]*new_vec[0])/(1+(new_vec[0]**2+new_vec[1]**2)**0.5))-90)
+            
+            self.vel += 0.25
+            self.bounce(0)
+            
         self.rect = (self.x, self.y, self.width, self.height)
 
 
@@ -114,7 +129,7 @@ def main():
     run = True
     p = Player(aspect[0]/2-(player_size[0]/2),aspect[1]-(player_size[1]/2),player_size[0],player_size[1],(200,200,200))
     barriers = init_barriers(barrier_size)
-    ball = Ball(aspect[0]/2,aspect[1]/2,25,(200,200,200))
+    ball = Ball(aspect[0]/2,aspect[1]/2,ball_size,(200,200,200))
 
     clock = pygame.time.Clock()
     while run:
@@ -125,7 +140,12 @@ def main():
                 pygame.quit()
         
         p.move()
-        ball.move()
+        ball.move(p)
+        if barriers.count != 0:
+            for barrier in barriers:
+                barrier.check_collide(ball, barriers)
+        else:
+            barriers = init_barriers(barrier_size)
         redrawWindow(win, p, barriers, ball)
 
 
